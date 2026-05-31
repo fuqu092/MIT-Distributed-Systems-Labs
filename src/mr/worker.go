@@ -1,11 +1,12 @@
 package mr
 
-import "fmt"
-import "log"
-import "net/rpc"
-import "hash/fnv"
-import "os"
-
+import (
+	"fmt"
+	"hash/fnv"
+	"log"
+	"net/rpc"
+	"os"
+)
 
 // Map functions return a slice of KeyValue.
 type KeyValue struct {
@@ -23,46 +24,55 @@ func ihash(key string) int {
 
 var coordSockName string // socket for coordinator
 
+// // example function to show how to make an RPC call to the coordinator.
+// //
+// // the RPC argument and reply types are defined in rpc.go.
+// func CallExample() {
 
-// main/mrworker.go calls this function.
-func Worker(sockname string, mapf func(string, string) []KeyValue,
-	reducef func(string, []string) string) {
+// 	// declare an argument structure.
+// 	args := ExampleArgs{}
 
-	coordSockName = sockname
+// 	// fill in the argument(s).
+// 	args.X = 99
 
-	// Your worker implementation here.
+// 	// declare a reply structure.
+// 	reply := ExampleReply{}
 
-	// uncomment to send the Example RPC to the coordinator.
-	// CallExample()
+// 	// send the RPC request, wait for the reply.
+// 	// the "Coordinator.Example" tells the
+// 	// receiving server that we'd like to call
+// 	// the Example() method of struct Coordinator.
+// 	ok := call("Coordinator.Example", &args, &reply)
+// 	if ok {
+// 		// reply.Y should be 100.
+// 		fmt.Printf("reply.Y %v\n", reply.Y)
+// 	} else {
+// 		fmt.Printf("call failed!\n")
+// 	}
+// }
 
+func GetWork() (GetWorkReply, bool) {
+	args := GetWorkArgs{}
+	reply := GetWorkReply{}
+
+	ok := call("Coordinator.GetWork", args, reply)
+
+	return reply, ok
 }
 
-// example function to show how to make an RPC call to the coordinator.
-//
-// the RPC argument and reply types are defined in rpc.go.
-func CallExample() {
+func SubmitWork(workId int, taskId int) bool {
+	args := WorkDoneArgs{}
+	reply := WorkDoneReply{}
 
-	// declare an argument structure.
-	args := ExampleArgs{}
+	args.WorkId = workId
+	args.TaskId = taskId
 
-	// fill in the argument(s).
-	args.X = 99
+	ok := call("Coordinator.SubmitWork", args, reply)
 
-	// declare a reply structure.
-	reply := ExampleReply{}
-
-	// send the RPC request, wait for the reply.
-	// the "Coordinator.Example" tells the
-	// receiving server that we'd like to call
-	// the Example() method of struct Coordinator.
-	ok := call("Coordinator.Example", &args, &reply)
-	if ok {
-		// reply.Y should be 100.
-		fmt.Printf("reply.Y %v\n", reply.Y)
-	} else {
-		fmt.Printf("call failed!\n")
-	}
+	return ok
 }
+
+// func doMapWork(taskId int, filename string)
 
 // send an RPC request to the coordinator, wait for the response.
 // usually returns true.
@@ -78,6 +88,26 @@ func call(rpcname string, args interface{}, reply interface{}) bool {
 	if err := c.Call(rpcname, args, reply); err == nil {
 		return true
 	}
+	fmt.Println("Really")
 	log.Printf("%d: call failed err %v", os.Getpid(), err)
 	return false
+}
+
+// main/mrworker.go calls this function.
+func Worker(sockname string, mapf func(string, string) []KeyValue,
+	reducef func(string, []string) string) {
+
+	coordSockName = sockname
+
+	// for {
+
+	// }
+
+	fmt.Println("Really")
+
+	work, ok := GetWork()
+
+	fmt.Println(work)
+	fmt.Println(ok)
+
 }

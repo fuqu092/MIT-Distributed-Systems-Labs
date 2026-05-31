@@ -6,18 +6,17 @@ package mr
 // remember to capitalize all names.
 //
 
-//
-// example to show how to declare the arguments
-// and reply for an RPC.
-//
+type GetWorkArgs struct{}
 
-type ExampleArgs struct {
-	X int
+type WorkDoneArgs struct {
+	WorkId int // 1 for maptask, 2 for reduce task
+	TaskId int // contains maptaskid or reducetaskid of completed task
 }
 
-type ExampleReply struct {
-	Y int
+type GetWorkReply struct {
+	WorkId   int    // 0 for no work, 1 for map task, 2 for reduce task
+	TaskId   int    // contains maptaskid or reducetaskid
+	Filename string // contains filename in case of map task
 }
 
-// Add your RPC definitions here.
-
+type WorkDoneReply struct{}
