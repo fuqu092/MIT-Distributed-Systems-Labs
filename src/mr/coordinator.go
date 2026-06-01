@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/rpc"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -21,9 +22,7 @@ const (
 type Coordinator struct {
 	numMapTasks    int
 	numReduceTasks int
-
-	mapIdFile map[int]string
-	mapFileId map[string]int
+	mapIdFile      map[int]string
 
 	remMapId    map[int]TaskStatus
 	numMapRem   int
@@ -48,7 +47,8 @@ func (c *Coordinator) GetWork(args *GetWorkArgs, reply *GetWorkReply) error {
 				c.remMapId[i] = InProgress
 				reply.WorkId = 1
 				reply.TaskId = i
-				reply.numReduceTasks = c.numReduceTasks
+				reply.NumMapTasks = c.numMapTasks
+				reply.NumReduceTasks = c.numReduceTasks
 				reply.Filename = c.mapIdFile[i]
 
 				return nil
@@ -60,7 +60,8 @@ func (c *Coordinator) GetWork(args *GetWorkArgs, reply *GetWorkReply) error {
 				c.remReduceId[i] = InProgress
 				reply.WorkId = 2
 				reply.TaskId = i
-				reply.numReduceTasks = c.numReduceTasks
+				reply.NumMapTasks = c.numMapTasks
+				reply.NumReduceTasks = c.numReduceTasks
 				reply.Filename = ""
 
 				return nil
@@ -84,6 +85,8 @@ func (c *Coordinator) SubmitWork(args *WorkDoneArgs, reply *WorkDoneReply) error
 		c.remMapId[args.TaskId] = Completed
 		c.numMapRem--
 
+		log.Println("Got map work for", args.TaskId)
+
 		return nil
 	} else {
 		c.mutexRemReduce.Lock()
@@ -95,6 +98,8 @@ func (c *Coordinator) SubmitWork(args *WorkDoneArgs, reply *WorkDoneReply) error
 
 		c.remReduceId[args.TaskId] = Completed
 		c.numReduceRem--
+
+		log.Println("Got reduce work for", args.TaskId)
 
 		return nil
 	}
@@ -119,6 +124,10 @@ func (c *Coordinator) Done() bool {
 	c.mutexRemReduce.Lock()
 	defer c.mutexRemReduce.Unlock()
 
+	if c.numReduceRem == 0 {
+		os.RemoveAll(intermediateDir)
+	}
+
 	return c.numReduceRem == 0
 }
 
@@ -126,13 +135,20 @@ func (c *Coordinator) Done() bool {
 // main/mrcoordinator.go calls this function.
 // nReduce is the number of reduce tasks to use.
 func MakeCoordinator(sockname string, files []string, nReduce int) *Coordinator {
-	c := Coordinator{numMapTasks: len(files), numReduceTasks: nReduce, mapIdFile: make(map[int]string), mapFileId: make(map[string]int), remMapId: make(map[int]TaskStatus), numMapRem: len(files), remReduceId: make(map[int]TaskStatus), numReduceRem: nReduce}
+	c := Coordinator{numMapTasks: len(files), numReduceTasks: nReduce, mapIdFile: make(map[int]string), remMapId: make(map[int]TaskStatus), numMapRem: len(files), remReduceId: make(map[int]TaskStatus), numReduceRem: nReduce}
 
 	for i, filename := range files {
 		c.mapIdFile[i] = filename
-		c.mapFileId[filename] = i
 		c.remMapId[i] = Idle
 	}
+
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Println("Cannot get directory", err)
+		return nil
+	}
+	intermediateDir = filepath.Join(dir, "IntermediateFiles")
+	os.Mkdir(intermediateDir, 0777)
 
 	for i := range nReduce {
 		c.remReduceId[i] = Idle
