@@ -1,6 +1,7 @@
 package mr
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -47,19 +48,19 @@ func (c *Coordinator) GetWork(args *GetWorkArgs, reply *GetWorkReply) error {
 				c.remMapId[i] = InProgress
 				reply.WorkId = 1
 				reply.TaskId = i
+				reply.numReduceTasks = c.numReduceTasks
 				reply.Filename = c.mapIdFile[i]
 
 				return nil
 			}
 		}
-	}
-
-	if c.numReduceRem != 0 {
+	} else if c.numReduceRem != 0 {
 		for i := range c.numReduceTasks {
 			if c.remReduceId[i] == Idle {
 				c.remReduceId[i] = InProgress
 				reply.WorkId = 2
 				reply.TaskId = i
+				reply.numReduceTasks = c.numReduceTasks
 				reply.Filename = ""
 
 				return nil
@@ -76,14 +77,24 @@ func (c *Coordinator) SubmitWork(args *WorkDoneArgs, reply *WorkDoneReply) error
 		c.mutexRemMap.Lock()
 		defer c.mutexRemMap.Unlock()
 
+		if c.remMapId[args.TaskId] == Completed {
+			return nil
+		}
+
 		c.remMapId[args.TaskId] = Completed
+		c.numMapRem--
 
 		return nil
 	} else {
 		c.mutexRemReduce.Lock()
 		defer c.mutexRemReduce.Unlock()
 
+		if c.remReduceId[args.TaskId] == Completed {
+			return nil
+		}
+
 		c.remReduceId[args.TaskId] = Completed
+		c.numReduceRem--
 
 		return nil
 	}
@@ -96,8 +107,9 @@ func (c *Coordinator) server(sockname string) {
 	os.Remove(sockname)
 	l, e := net.Listen("unix", sockname)
 	if e != nil {
-		log.Fatalf("listen error %s: %v", sockname, e)
+		log.Fatalln("Listen error", sockname, ":", e)
 	}
+	fmt.Println("Server started.")
 	go http.Serve(l, nil)
 }
 
