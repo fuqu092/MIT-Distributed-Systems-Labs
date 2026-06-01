@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 type TaskStatus int
@@ -51,6 +52,8 @@ func (c *Coordinator) GetWork(args *GetWorkArgs, reply *GetWorkReply) error {
 				reply.NumReduceTasks = c.numReduceTasks
 				reply.Filename = c.mapIdFile[i]
 
+				go c.monitorTask(1, i)
+
 				return nil
 			}
 		}
@@ -63,6 +66,8 @@ func (c *Coordinator) GetWork(args *GetWorkArgs, reply *GetWorkReply) error {
 				reply.NumMapTasks = c.numMapTasks
 				reply.NumReduceTasks = c.numReduceTasks
 				reply.Filename = ""
+
+				go c.monitorTask(2, i)
 
 				return nil
 			}
@@ -129,6 +134,34 @@ func (c *Coordinator) Done() bool {
 	}
 
 	return c.numReduceRem == 0
+}
+
+func (c *Coordinator) monitorTask(workId int, taskId int) {
+	ticker := time.NewTicker(10 * time.Second)
+
+	for range ticker.C {
+		if workId == 1 {
+			c.mutexRemMap.Lock()
+
+			if c.remMapId[taskId] == Completed {
+				c.mutexRemMap.Unlock()
+				ticker.Stop()
+				return
+			}
+			c.remMapId[taskId] = Idle
+			c.mutexRemMap.Unlock()
+		} else {
+			c.mutexRemReduce.Lock()
+
+			if c.remReduceId[taskId] == Completed {
+				c.mutexRemReduce.Unlock()
+				ticker.Stop()
+				return
+			}
+			c.remReduceId[taskId] = Idle
+			c.mutexRemReduce.Unlock()
+		}
+	}
 }
 
 // create a Coordinator.
