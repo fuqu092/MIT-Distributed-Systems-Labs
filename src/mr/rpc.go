@@ -14,9 +14,11 @@ type WorkDoneArgs struct {
 }
 
 type GetWorkReply struct {
-	WorkId   int    // 0 for no work, 1 for map task, 2 for reduce task
-	TaskId   int    // contains maptaskid or reducetaskid
-	Filename string // contains filename in case of map task
+	WorkId         int    // 0 for no work, 1 for map task, 2 for reduce task
+	TaskId         int    // contains maptaskid or reducetaskid
+	NumMapTasks    int    // num of map tasks
+	NumReduceTasks int    // num of reduce tasks
+	Filename       string // contains filename in case of map task
 }
 
 type WorkDoneReply struct{}
